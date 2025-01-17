@@ -173,7 +173,7 @@ def main():
                 <a href='https://www.linkedin.com/in/geethikaisuru/' target='_blank'>🔗 LinkedIn</a>
                 <a href='https://github.com/geethikaisuru' target='_blank'>💻 GitHub</a>
             </div>
-            <p>Built with ❤️ by Geethika</p>
+            <a href='https://www.linkedin.com/in/geethikaisuru/' target='_blank'>Built with ❤️ by Geethika</a>
         </div>
     """, unsafe_allow_html=True)
 
