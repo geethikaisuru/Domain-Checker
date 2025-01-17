@@ -6,7 +6,7 @@ import pandas as pd
 
 # Page configuration
 st.set_page_config(
-    page_title="Bulk Domain Checker by Avensu",
+    page_title="Bulk Domain Checker by Geethika",
     page_icon="🔍"
 )
 
