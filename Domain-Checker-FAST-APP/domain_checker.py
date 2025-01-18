@@ -3,6 +3,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from utils import clean_domain_name, check_single_domain
+import streamlit as st
 
 class DomainChecker:
     def __init__(self, max_workers: int = 10, rate_limit: float = 0.1):
@@ -10,10 +11,12 @@ class DomainChecker:
         self.rate_limit = rate_limit
         self.results_queue = queue.Queue()
         self.worker_progress = {i: 0.0 for i in range(max_workers)}
+        self.worker_processed_count = {i: 0 for i in range(max_workers)}  # Added
         self.processed_count = 0
         self.total_domains = 0
         self.last_request_time = time.time()
         self.lock = threading.Lock()
+        self.progress_bars = [st.progress(0.0) for _ in range(max_workers)]  # Added
 
     def process_domain(self, domain: str, worker_id: int, worker_domains: int) -> dict:
         """Process a single domain with rate limiting and worker-specific progress"""
@@ -35,9 +38,11 @@ class DomainChecker:
         }
 
         with self.lock:
+            self.worker_processed_count[worker_id] += 1
+            self.worker_progress[worker_id] = self.worker_processed_count[worker_id] / worker_domains
             self.processed_count += 1
-            self.worker_progress[worker_id] = self.processed_count / worker_domains
             self.results_queue.put((result, self.processed_count / self.total_domains, worker_id))
+            self.progress_bars[worker_id].progress(self.worker_progress[worker_id])  # Added
 
         return result
 
