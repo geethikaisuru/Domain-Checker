@@ -6,7 +6,7 @@ import pandas as pd
 
 # Page configuration
 st.set_page_config(
-    page_title="Bulk Domain Checker by Geethika",
+    page_title="Domain Checker Pro",
     page_icon="🔍"
 )
 
@@ -87,15 +87,38 @@ def check_single_domain(domain_name):
     except Exception as e:
         return "Error ⚠️", str(e)
 
+def process_domain_list(domains):
+    """
+    Process a list of domains and return results
+    """
+    results = []
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    for i, domain in enumerate(domains):
+        if domain:  # Skip empty lines
+            status_text.text(f"🔍 Checking domain: {domain}")
+            cleaned_domain = clean_domain_name(domain)
+            status, error = check_single_domain(cleaned_domain)
+            
+            results.append({
+                'Original Domain': domain,
+                'Cleaned Domain': f"{cleaned_domain}.com",
+                'Status': status,
+                'Error': error if error else ''
+            })
+            
+            progress_bar.progress((i + 1) / len(domains))
+    
+    return results
+
 def main():
     # Main content wrapper div
     st.markdown('<div class="main">', unsafe_allow_html=True)
     
     # Title with custom styling
-    st.markdown("<h1 class='main-title'>Domain Checker Pro 🔍 </h1>", unsafe_allow_html=True)
-    st.markdown("###### You can check the availability of thousands of domains at once!")
-    st.markdown("###### Just upload a text file with one domain name per line and click a button to check all domains.")
-
+    st.markdown("<h1 class='main-title'>🔍 Domain Availability Checker Pro</h1>", unsafe_allow_html=True)
+    st.markdown("### Find your perfect domain name! 🎯")
     
     # Create two tabs with emojis
     tab1, tab2 = st.tabs(["📑 Bulk Domain Check", "🎯 Single Domain Check"])
@@ -103,31 +126,36 @@ def main():
     # Bulk Domain Check Tab
     with tab1:
         st.header("📑 Bulk Domain Check")
-        st.info("Upload a text file with one domain name per line to check multiple domains at once!")
-        uploaded_file = st.file_uploader("Choose a file 📂", type=['txt'])
         
-        if uploaded_file is not None:
-            domains = [line.decode('utf-8').strip() for line in uploaded_file]
+        # Radio button for input method selection
+        input_method = st.radio(
+            "Choose input method",
+            ["Upload TXT File 📂", "Paste Domain List 📝"]
+        )
+        
+        domains = None
+        
+        if input_method == "Upload TXT File 📂":
+            st.info("Upload a text file with one domain name per line")
+            uploaded_file = st.file_uploader("Choose a file", type=['txt'])
             
+            if uploaded_file is not None:
+                domains = [line.decode('utf-8').strip() for line in uploaded_file]
+        
+        else:  # Paste Domain List
+            st.info("Enter domain names (one per line)")
+            text_input = st.text_area(
+                "Paste your domains here",
+                height=200,
+                placeholder="example1\nexample2\nexample3"
+            )
+            
+            if text_input:
+                domains = [line.strip() for line in text_input.split('\n')]
+        
+        if domains:  # Process domains regardless of input method
             if st.button("🚀 Check All Domains"):
-                results = []
-                progress_bar = st.progress(0)
-                status_text = st.empty()
-                
-                for i, domain in enumerate(domains):
-                    if domain:
-                        status_text.text(f"🔍 Checking domain: {domain}")
-                        cleaned_domain = clean_domain_name(domain)
-                        status, error = check_single_domain(cleaned_domain)
-                        
-                        results.append({
-                            'Original Domain': domain,
-                            'Cleaned Domain': f"{cleaned_domain}.com",
-                            'Status': status,
-                            'Error': error if error else ''
-                        })
-                        
-                        progress_bar.progress((i + 1) / len(domains))
+                results = process_domain_list(domains)
                 
                 df = pd.DataFrame(results)
                 st.success("✨ Check completed!")
@@ -163,9 +191,6 @@ def main():
             else:
                 st.warning("⚠️ Please enter a domain name")
     
-    # Close main content wrapper
-    st.markdown('</div>', unsafe_allow_html=True)
-    
     # Footer with social links
     st.markdown("""
         <div class='footer'>
@@ -173,7 +198,7 @@ def main():
                 <a href='https://www.linkedin.com/in/geethikaisuru/' target='_blank'>🔗 LinkedIn</a>
                 <a href='https://github.com/geethikaisuru' target='_blank'>💻 GitHub</a>
             </div>
-            <a href='https://www.linkedin.com/in/geethikaisuru/' target='_blank'>Built with ❤️ by Geethika</a>
+            <p>Built with ❤️ by Geethika</p>
         </div>
     """, unsafe_allow_html=True)
 
