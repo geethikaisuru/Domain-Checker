@@ -88,9 +88,6 @@ class DomainChecker:
     def __init__(self, max_workers: int = 10, rate_limit: float = 0.1):
         self.max_workers = max_workers
         self.rate_limit = rate_limit
-        self.results_queue = queue.Queue()
-        self.processed_count = 0
-        self.total_domains = 0
         self.last_request_time = time.time()
         self.lock = threading.Lock()
 
@@ -106,86 +103,58 @@ class DomainChecker:
 
         status, error = check_single_domain(domain)
         
-        result = {
+        return {
             'Original Domain': domain,
             'Cleaned Domain': f"{clean_domain_name(domain)}.com",
             'Status': status,
             'Error': error if error else ''
         }
-        
-        # Update progress
-        with self.lock:
-            self.processed_count += 1
-            progress = self.processed_count / self.total_domains
-            self.results_queue.put((progress, result))
-        
-        return result
-
-    def check_domains(self, domains: List[str]) -> List[Dict]:
-        """Check multiple domains in parallel"""
-        self.processed_count = 0
-        self.total_domains = len(domains)
-        results = []
-        
-        with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-            future_to_domain = {executor.submit(self.process_domain, domain): domain 
-                              for domain in domains if domain.strip()}
-            
-            for future in concurrent.futures.as_completed(future_to_domain):
-                results.append(future.result())
-                
-        return results
-
 def process_domain_list(domains: List[str]) -> List[Dict]:
     """Process a list of domains with progress tracking"""
     if not domains:
         return []
     
     # Initialize progress tracking
-    progress_bar = st.progress(0)
-    status_text = st.empty()
-    results_container = st.empty()
+    progress_placeholder = st.empty()
+    status_placeholder = st.empty()
+    results_placeholder = st.empty()
     
-    # Initialize domain checker with parallel processing
+    # Initialize domain checker
     checker = DomainChecker(max_workers=10, rate_limit=0.1)
-    
-    # Create a separate thread for processing domains
     results = []
     
-    def update_progress():
-        temp_results = []
-        while len(temp_results) < len(domains):
+    # Process domains in chunks to update progress
+    total_domains = len(domains)
+    
+    with ThreadPoolExecutor(max_workers=10) as executor:
+        future_to_domain = {
+            executor.submit(checker.process_domain, domain): domain 
+            for domain in domains if domain.strip()
+        }
+        
+        completed = 0
+        for future in concurrent.futures.as_completed(future_to_domain):
             try:
-                progress, result = checker.results_queue.get(timeout=0.1)
-                temp_results.append(result)
+                result = future.result()
+                results.append(result)
                 
-                # Update progress bar and status
-                progress_bar.progress(progress)
-                status_text.text(f"🔍 Checking domain: {result['Original Domain']} ({len(temp_results)}/{len(domains)})")
+                # Update progress and status
+                completed += 1
+                progress = completed / total_domains
+                
+                # Update UI elements in the main thread
+                progress_placeholder.progress(progress)
+                status_placeholder.text(f"🔍 Checking domain: {result['Original Domain']} ({completed}/{total_domains})")
                 
                 # Update results display
-                df = pd.DataFrame(temp_results)
-                results_container.dataframe(df)
+                df = pd.DataFrame(results)
+                results_placeholder.dataframe(df)
                 
-            except queue.Empty:
-                continue
             except Exception as e:
-                st.error(f"Error in progress update: {str(e)}")
-                break
-        return temp_results
-
-    # Start progress update thread
-    progress_thread = threading.Thread(target=lambda: results.extend(update_progress()))
-    progress_thread.start()
-    
-    # Process domains
-    results = checker.check_domains([d for d in domains if d.strip()])
-    
-    # Wait for progress thread to complete
-    progress_thread.join()
-    
+                st.error(f"Error processing domain: {str(e)}")
+                
     return results
-
+    
 def main():
     # Main content wrapper div
     st.markdown('<div class="main">', unsafe_allow_html=True)
